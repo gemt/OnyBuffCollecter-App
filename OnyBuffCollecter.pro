@@ -4,17 +4,15 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui widgets network printsupport
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = OnyBuffCollecter
 TEMPLATE = app
-
+CONFIG += qt gui c++11
 
 SOURCES += main.cpp\
         mainwindow.cpp
 
 HEADERS  += mainwindow.h
-
-FORMS    +=
