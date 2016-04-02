@@ -96,6 +96,7 @@ void MainWindow::SetupGUI()
 	labels.insert(T_GUILD, "Guild");
 	table->setHorizontalHeaderLabels(labels);
 	table->horizontalHeader()->setStretchLastSection(true);
+	table->setSortingEnabled(true);
 	main_layout->addWidget(table);
 
 	
@@ -242,7 +243,7 @@ void MainWindow::ParseLUA(const QString& file_path)
 		QString date_str = get_val(split_list[i + 1]);
 		
 		QDateTime dt = QDateTime::fromString(date_str, "MM/dd/yy HH:mm:ss");
-		dt.addYears(100); //when only yy, it defaults to 19yy instead of 20yy, :(
+		dt = dt.addYears(100); //when only yy, it defaults to 19yy instead of 20yy, :(
 		if (data_map.contains(name_str))
 			continue;
 
