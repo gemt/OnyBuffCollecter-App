@@ -129,7 +129,6 @@ void MainWindow::on_net_reply(QNetworkReply* reply)
 	}
 
 	QString data = reply->readAll();
-	qDebug() << data;
 	int start = data.indexOf("<ul class=\"breadcrumb\">");
 	if (start == -1) return;
 	int stop = data.indexOf("<!--/.breadcrumb -->");
@@ -155,7 +154,6 @@ void MainWindow::on_net_reply(QNetworkReply* reply)
 		if (data_map[player_name].guild_itm)
 			data_map[player_name].guild_itm->setText(breadcrumb);
 	}
-	
 }
 
 void MainWindow::Information(QString s)
