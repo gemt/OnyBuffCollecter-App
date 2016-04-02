@@ -21,6 +21,11 @@
 #include <QTableWidget>
 #include <QLabel>
 #include <QTableWidgetItem>
+#include <QHeaderView>
+
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -40,15 +45,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	QRect rec = QApplication::desktop()->screenGeometry();
 	resize(rec.width()/4, rec.height()/4);
 
+	net_man = new QNetworkAccessManager(widget);
+	connect(net_man, SIGNAL(finished(QNetworkReply*)), this, SLOT(on_net_reply(QNetworkReply*)));
 	SetupGUI();
-
-	FindBuffs();
-	
-	UpdateTable();
-
-	foreach(BuffData d, data_map.values()){
-		qDebug() << d.name << d.date_time.toString();
-	}
 }
 
 MainWindow::~MainWindow()
@@ -80,6 +79,13 @@ void MainWindow::SetupGUI()
 
 	connect(browse_btn, SIGNAL(clicked()), this, SLOT(on_browse_clicked()));
     
+	QPushButton* load_btn = new QPushButton("Load data");
+	input_layout->addWidget(load_btn);
+	connect(load_btn, &QPushButton::clicked, [this](){
+		FindBuffs();
+		UpdateTable();
+	});
+
 	main_layout->addWidget(new QLabel("Discovered buffs:"));
 	table = new QTableWidget();
 	table->setColumnCount(T_NUM_COLS);
@@ -89,6 +95,7 @@ void MainWindow::SetupGUI()
 	labels.insert(T_NAME, "Name");
 	labels.insert(T_GUILD, "Guild");
 	table->setHorizontalHeaderLabels(labels);
+	table->horizontalHeader()->setStretchLastSection(true);
 	main_layout->addWidget(table);
 
 	
@@ -114,6 +121,42 @@ void MainWindow::on_browse_clicked()
 	}
 }
 
+void MainWindow::on_net_reply(QNetworkReply* reply)
+{
+	if (reply->error() != QNetworkReply::NoError){
+		qDebug() << reply->errorString();
+		return;
+	}
+
+	QString data = reply->readAll();
+	qDebug() << data;
+	int start = data.indexOf("<ul class=\"breadcrumb\">");
+	if (start == -1) return;
+	int stop = data.indexOf("<!--/.breadcrumb -->");
+	if (stop == -1) return;
+
+	QString breadcrumb = data.mid(start, stop);
+	if (breadcrumb.isEmpty())
+		return;
+	
+	start = breadcrumb.indexOf("guild=");
+	if (start == -1) return;
+	breadcrumb = breadcrumb.right(breadcrumb.size() - start);
+	stop = breadcrumb.indexOf("'>");
+	if (stop == -1) return;
+	breadcrumb = breadcrumb.left(stop);
+	breadcrumb = breadcrumb.remove("guild=");
+	breadcrumb = breadcrumb.trimmed();
+	
+	QString player_name = reply->url().toString().remove(url_base);
+	if (data_map.contains(player_name)){
+		data_map[player_name].guild = breadcrumb;
+
+		if (data_map[player_name].guild_itm)
+			data_map[player_name].guild_itm->setText(breadcrumb);
+	}
+	
+}
 
 void MainWindow::Information(QString s)
 {
@@ -162,7 +205,6 @@ void MainWindow::FindBuffs()
 
 void MainWindow::ParseLUA(const QString& file_path)
 {
-	qDebug() << "parsing: " << file_path;
 	QFile f(file_path);
 	if (!f.open(QIODevice::ReadOnly)){
 		Information(QString("Unable to open file: %1").arg(file_path));
@@ -189,6 +231,16 @@ void MainWindow::ParseLUA(const QString& file_path)
 			continue;
 		}
 		QString name_str = get_val(split_list[i]);
+		if (!name_str.isEmpty()){
+			if (!name_str.at(0).isUpper())
+				//skipping names that does not start with an upper-case letter,
+				//as we won't find them on Realmplayers, and it's probably a bug.
+				continue; 
+		}
+		else{
+			continue;
+		}
+		RequestRealmplayerData(name_str); //send of an asynchronous request for realmplayer data
 		QString date_str = get_val(split_list[i + 1]);
 		
 		QDateTime dt = QDateTime::fromString(date_str, "MM/dd/yy HH:mm:ss");
@@ -202,19 +254,29 @@ void MainWindow::ParseLUA(const QString& file_path)
 	}
 }
 
+void MainWindow::RequestRealmplayerData(const QString& name)
+{
+	
+	QUrl url(url_base + name);
+	QNetworkRequest req(url);
+	net_man->get(req);
+}
+
 void MainWindow::UpdateTable()
 {
 	while (table->rowCount())
 		table->removeRow(0);
 
-	foreach(BuffData d, data_map.values()){
+	for (auto it = data_map.begin(); it != data_map.end(); it++){
+		BuffData& d = it.value();
 		table->insertRow(0);
 		
 		table->setItem(0, T_DATE, new QTableWidgetItem(d.date_time.date().toString(Qt::ISODate)));
 		table->setItem(0, T_TIME, new QTableWidgetItem(d.date_time.time().toString()));
 		table->setItem(0, T_NAME, new QTableWidgetItem(d.name));
-		table->setItem(0, T_GUILD, new QTableWidgetItem(d.guild));
+		d.guild_itm = new QTableWidgetItem(d.guild);
+		table->setItem(0, T_GUILD, d.guild_itm);
 	}
-
 	table->resizeColumnsToContents();
+	
 }
