@@ -6,7 +6,7 @@
 
 QT       += core gui widgets network printsupport
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+greaterThan(QT_MAJOR_VERSION, 5): QT += widgets
 
 TARGET = OnyBuffCollecter
 TEMPLATE = app
